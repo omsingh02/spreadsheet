@@ -5,8 +5,8 @@
     'use strict';
 
     // Limits
-    const MAX_ROWS = 100;
-    const MAX_COLS = 26;
+    const MAX_ROWS = 30;
+    const MAX_COLS = 15;
     const DEBOUNCE_DELAY = 200;
 
     // Default starting size
