@@ -49,6 +49,7 @@
     let formulaDropdownItems = [];     // List of visible dropdown items
     let formulaDropdownIndex = -1;     // Active item index
     let formulaDropdownAnchor = null;  // Cell element used for positioning
+    let editingCell = null;            // { row, col } when editing a cell's text
 
     // Create empty data array with specified dimensions
     function createEmptyData(r, c) {
@@ -650,6 +651,7 @@
         }
 
         if (!isNaN(row) && !isNaN(col) && row < rows && col < cols) {
+            setEditingCell(row, col);
             const rawValue = target.innerText.trim();
 
             if (rawValue.startsWith('=')) {
@@ -827,6 +829,30 @@
         return { row, col };
     }
 
+    function getCellContentElement(row, col) {
+        return document.querySelector(`.cell-content[data-row="${row}"][data-col="${col}"]`);
+    }
+
+    function focusCellAt(row, col) {
+        const cellContent = getCellContentElement(row, col);
+        if (!cellContent) return null;
+        cellContent.focus();
+        cellContent.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        return cellContent;
+    }
+
+    function setEditingCell(row, col) {
+        editingCell = { row, col };
+    }
+
+    function clearEditingCell() {
+        editingCell = null;
+    }
+
+    function isEditingCell(row, col) {
+        return !!(editingCell && editingCell.row === row && editingCell.col === col);
+    }
+
     function handleFocusIn(event) {
         const target = event.target;
         if (!target.classList.contains('cell-content')) return;
@@ -887,6 +913,7 @@
         }
 
         // Exit formula edit mode when focus truly leaves
+        clearEditingCell();
         formulaEditMode = false;
         formulaEditCell = null;
         formulaRangeStart = null;
@@ -904,6 +931,27 @@
     }
 
     // ========== Mouse Selection Handlers ==========
+
+    function handleCellDoubleClick(event) {
+        if (!(event.target instanceof Element)) return;
+
+        let cellContent = null;
+        if (event.target.classList.contains('cell-content')) {
+            cellContent = event.target;
+        } else if (event.target.classList.contains('cell')) {
+            cellContent = event.target.querySelector('.cell-content');
+        } else {
+            cellContent = event.target.closest('.cell-content');
+        }
+
+        if (!cellContent || !cellContent.classList.contains('cell-content')) return;
+
+        const row = parseInt(cellContent.dataset.row, 10);
+        const col = parseInt(cellContent.dataset.col, 10);
+
+        if (isNaN(row) || isNaN(col)) return;
+        setEditingCell(row, col);
+    }
 
     function handleMouseDown(event) {
         // Only handle left mouse button
@@ -1082,6 +1130,43 @@
             }
         }
 
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            const target = event.target;
+            if (target.classList.contains('cell-content') && !event.altKey && !event.ctrlKey && !event.metaKey) {
+                const row = parseInt(target.dataset.row, 10);
+                const col = parseInt(target.dataset.col, 10);
+
+                if (!isNaN(row) && !isNaN(col) && !formulaEditMode && !isEditingCell(row, col)) {
+                    let nextRow = row;
+                    let nextCol = col;
+
+                    if (event.key === 'ArrowUp') nextRow -= 1;
+                    if (event.key === 'ArrowDown') nextRow += 1;
+                    if (event.key === 'ArrowLeft') nextCol -= 1;
+                    if (event.key === 'ArrowRight') nextCol += 1;
+
+                    nextRow = Math.max(0, Math.min(rows - 1, nextRow));
+                    nextCol = Math.max(0, Math.min(cols - 1, nextCol));
+
+                    event.preventDefault();
+
+                    if (event.shiftKey) {
+                        if (!selectionStart) {
+                            selectionStart = { row, col };
+                        }
+                        selectionEnd = { row: nextRow, col: nextCol };
+                    } else {
+                        selectionStart = { row: nextRow, col: nextCol };
+                        selectionEnd = { row: nextRow, col: nextCol };
+                    }
+
+                    updateSelectionVisuals();
+                    focusCellAt(nextRow, nextCol);
+                    return;
+                }
+            }
+        }
+
         // Escape key clears selection
         if (event.key === 'Escape' && hasMultiSelection()) {
             clearSelection();
@@ -1101,6 +1186,7 @@
 
             // Prevent default newline behavior
             event.preventDefault();
+            clearEditingCell();
 
             // Check if this is a formula cell - evaluate it
             const rawValue = target.innerText.trim();
@@ -1398,6 +1484,7 @@
 
             // Selection mouse events
             container.addEventListener('mousedown', handleMouseDown);
+            container.addEventListener('dblclick', handleCellDoubleClick);
             container.addEventListener('mousemove', handleMouseMove);
             container.addEventListener('mouseup', handleMouseUp);
             container.addEventListener('keydown', handleSelectionKeyDown);
