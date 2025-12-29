@@ -153,6 +153,29 @@ body {
     display: inline;
 }
 
+/* Copy URL button */
+.copy-btn {
+    background: transparent !important;
+    border: 1px solid var(--border-color) !important;
+    padding: 8px 10px !important;
+    font-size: 0.875rem !important;
+    color: var(--text-secondary) !important;
+}
+
+.copy-btn:hover:not(:disabled) {
+    background: var(--bg-header) !important;
+    color: var(--text-primary) !important;
+}
+
+.copy-btn.copied {
+    color: #22c55e !important;
+    border-color: #22c55e !important;
+}
+
+.copy-btn.copied i::before {
+    content: "\f00c"; /* fa-check */
+}
+
 /* GitHub link */
 .github-link {
     display: flex;

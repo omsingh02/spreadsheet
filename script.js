@@ -294,6 +294,52 @@
         }
     }
 
+    // Copy URL to clipboard
+    function copyURL() {
+        const url = window.location.href;
+        const copyBtn = document.getElementById('copy-url');
+
+        navigator.clipboard.writeText(url).then(function() {
+            // Show success feedback
+            if (copyBtn) {
+                copyBtn.classList.add('copied');
+                const icon = copyBtn.querySelector('i');
+                if (icon) {
+                    icon.className = 'fa-solid fa-check';
+                }
+
+                // Reset after 2 seconds
+                setTimeout(function() {
+                    copyBtn.classList.remove('copied');
+                    if (icon) {
+                        icon.className = 'fa-solid fa-copy';
+                    }
+                }, 2000);
+            }
+        }).catch(function(err) {
+            console.error('Failed to copy URL:', err);
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = url;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                if (copyBtn) {
+                    copyBtn.classList.add('copied');
+                    setTimeout(function() {
+                        copyBtn.classList.remove('copied');
+                    }, 2000);
+                }
+            } catch (e) {
+                console.error('Fallback copy failed:', e);
+            }
+            document.body.removeChild(textArea);
+        });
+    }
+
     // Initialize the app
     function init() {
         // Load theme preference first (before any rendering)
@@ -315,6 +361,7 @@
         const addRowBtn = document.getElementById('add-row');
         const addColBtn = document.getElementById('add-col');
         const themeToggleBtn = document.getElementById('theme-toggle');
+        const copyUrlBtn = document.getElementById('copy-url');
 
         if (addRowBtn) {
             addRowBtn.addEventListener('click', addRow);
@@ -324,6 +371,9 @@
         }
         if (themeToggleBtn) {
             themeToggleBtn.addEventListener('click', toggleTheme);
+        }
+        if (copyUrlBtn) {
+            copyUrlBtn.addEventListener('click', copyURL);
         }
 
         // Handle browser back/forward
