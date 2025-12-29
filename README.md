@@ -34,6 +34,14 @@ A lightweight, client-only spreadsheet web application. All data persists in the
 - **Clear Spreadsheet** - Reset to empty 10×10 grid with confirmation
 - **Live Grid Size** - Display shows current dimensions
 
+### Formula Support
+- **SUM Function** - Calculate totals with `=SUM(A1:B5)` syntax
+- **Formula Autocomplete** - Dropdown suggestions appear when typing `=`
+- **Range Selection** - Click/drag cells while editing to insert range references
+- **Live Evaluation** - Formulas evaluate on Enter or when leaving the cell
+- **Error Handling** - Shows `#REF!` for invalid ranges, `#ERROR!` for unknown formulas
+- **Shareable Formulas** - Formulas preserved in URL for sharing
+
 ### Theme Support
 - **Dark/Light Mode** - Toggle with sun/moon button
 - **System Detection** - Respects OS dark mode preference
@@ -65,10 +73,10 @@ npx serve .
 Your spreadsheet data is stored entirely in the URL hash:
 
 ```
-https://yoursite.com/spreadsheet/#{"rows":10,"cols":10,"data":[["A1","B1"],["A2","B2"]],"theme":"light"}
+https://yoursite.com/spreadsheet/#{"rows":10,"cols":10,"data":[["A1","B1"],["A2","B2"]],"formulas":[[null,null],[null,"=SUM(A1:A2)"]],"theme":"light"}
 ```
 
-When you edit cells, the URL updates automatically (debounced at 200ms). Share the URL to share your data—no account or database needed.
+When you edit cells, the URL updates automatically (debounced at 200ms). Formulas are stored separately from displayed values, so both the results and the original formulas are preserved. Share the URL to share your data—no account or database needed.
 
 ## Usage
 
@@ -82,6 +90,8 @@ When you edit cells, the URL updates automatically (debounced at 200ms). Share t
 | Add row | Click "+ Row" button (max 30) |
 | Add column | Click "+ Column" button (max 15) |
 | Clear all | Click "Clear" button (with confirmation) |
+| Enter formula | Type `=` followed by function (e.g., `=SUM(A1:B5)`) |
+| Select formula range | Click/drag cells while editing a formula |
 | Share | Click copy button to copy URL |
 | Toggle theme | Click sun/moon icon |
 
@@ -92,9 +102,11 @@ When you edit cells, the URL updates automatically (debounced at 200ms). Share t
 | Ctrl+B | Bold |
 | Ctrl+I | Italic |
 | Ctrl+U | Underline |
-| Escape | Clear selection |
+| Enter | Evaluate formula and move down |
+| Escape | Clear selection / Close formula dropdown |
+| Tab | Move to next cell / Select formula suggestion |
+| Arrow Up/Down | Navigate formula suggestions |
 | Shift+Click | Extend selection |
-| Tab | Move to next cell |
 
 ## Tech Stack
 
@@ -155,6 +167,14 @@ http://localhost:3000
 ```
 
 ## Recent Updates
+
+### v1.3 - Formula Support
+- Added formula evaluation with `=SUM(range)` function
+- Formula autocomplete dropdown with suggestions
+- Click-to-select range references while editing formulas
+- Keyboard navigation in formula dropdown (Up/Down/Enter/Tab/Escape)
+- Formulas preserved in shareable URLs
+- Enter key evaluates formula and moves to next row
 
 ### v1.2 - Multi-Cell Selection & Clear
 - Added Google Sheets-style multi-cell selection

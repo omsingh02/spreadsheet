@@ -14,7 +14,8 @@
     const DEFAULT_ROWS = 10;
     const DEFAULT_COLS = 10;
     const FORMULA_SUGGESTIONS = [
-        { name: 'SUM', signature: 'SUM(range)', description: 'Adds numbers in a range' }
+        { name: 'SUM', signature: 'SUM(range)', description: 'Adds numbers in a range' },
+        { name: 'AVG', signature: 'AVG(range)', description: 'Average of numbers in a range' }
     ];
 
     // Dynamic dimensions
@@ -337,6 +338,31 @@
         return sum;
     }
 
+    // Evaluate AVG(range)
+    function evaluateAVG(rangeStr) {
+        const range = parseRange(rangeStr);
+        if (!range) return '#REF!';
+
+        // Check if range is within grid bounds
+        if (range.endRow >= rows || range.endCol >= cols) return '#REF!';
+
+        let sum = 0;
+        let count = 0;
+        for (let r = range.startRow; r <= range.endRow; r++) {
+            for (let c = range.startCol; c <= range.endCol; c++) {
+                const raw = data[r][c];
+                if (raw === null || raw === undefined) continue;
+                const stripped = String(raw).replace(/<[^>]*>/g, '').trim();
+                if (stripped === '') continue;
+                const num = parseFloat(stripped);
+                if (isNaN(num)) continue;
+                sum += num;
+                count++;
+            }
+        }
+        return count === 0 ? 0 : sum / count;
+    }
+
     // Main formula evaluator
     function evaluateFormula(formula) {
         if (!formula || !formula.startsWith('=')) return formula;
@@ -347,6 +373,12 @@
         const sumMatch = expr.match(/^SUM\(([A-Z]+\d+:[A-Z]+\d+)\)$/);
         if (sumMatch) {
             return evaluateSUM(sumMatch[1]);
+        }
+
+        // Match AVG(range)
+        const avgMatch = expr.match(/^AVG\(([A-Z]+\d+:[A-Z]+\d+)\)$/);
+        if (avgMatch) {
+            return evaluateAVG(avgMatch[1]);
         }
 
         // Unknown formula
