@@ -147,19 +147,19 @@
         corner.className = 'corner-cell';
         container.appendChild(corner);
 
-        // Column headers (A-Z)
+        // Column headers (A-Z) - sticky to top
         for (let col = 0; col < cols; col++) {
             const header = document.createElement('div');
-            header.className = 'header-cell';
+            header.className = 'header-cell col-header';
             header.textContent = colToLetter(col);
             container.appendChild(header);
         }
 
         // Rows
         for (let row = 0; row < rows; row++) {
-            // Row header (1, 2, 3...)
+            // Row header (1, 2, 3...) - sticky to left
             const rowHeader = document.createElement('div');
-            rowHeader.className = 'header-cell';
+            rowHeader.className = 'header-cell row-header';
             rowHeader.textContent = row + 1;
             container.appendChild(rowHeader);
 

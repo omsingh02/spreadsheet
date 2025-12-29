@@ -8,16 +8,18 @@
 </head>
 <body>
     <div class="container">
-        <h1>Spreadsheet</h1>
-        <div class="toolbar">
-            <button id="add-row" type="button">+ Add Row</button>
-            <button id="add-col" type="button">+ Add Column</button>
-            <span id="grid-size" class="grid-size">10 × 10</span>
+        <div class="header">
+            <h1>Spreadsheet</h1>
+            <div class="toolbar">
+                <button id="add-row" type="button">+ Row</button>
+                <button id="add-col" type="button">+ Column</button>
+                <span id="grid-size" class="grid-size">10 × 10</span>
+            </div>
         </div>
         <div class="grid-wrapper">
             <div id="spreadsheet" class="spreadsheet"></div>
         </div>
-        <p class="hint">Data is saved in the URL - share the link to share your spreadsheet!</p>
+        <div class="hint">Data is saved in the URL - share the link to share your spreadsheet</div>
     </div>
     <script src="script.js"></script>
 </body>

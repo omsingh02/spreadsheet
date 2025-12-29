@@ -4,35 +4,51 @@
     box-sizing: border-box;
 }
 
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background-color: #f5f5f5;
-    min-height: 100vh;
-    padding: 20px;
 }
 
 .container {
-    max-width: 1200px;
-    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
 }
 
-h1 {
+/* Header bar */
+.header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.header h1 {
     color: #333;
-    margin-bottom: 16px;
     font-weight: 500;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+    margin: 0;
 }
 
 .toolbar {
     display: flex;
-    gap: 10px;
-    margin-bottom: 16px;
+    gap: 8px;
     align-items: center;
+    flex: 1;
 }
 
 .toolbar button {
-    padding: 8px 16px;
-    font-size: 0.875rem;
+    padding: 6px 12px;
+    font-size: 0.8125rem;
     font-family: inherit;
     background-color: #4a90d9;
     color: white;
@@ -53,16 +69,15 @@ h1 {
 
 .grid-size {
     color: #888;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     margin-left: auto;
 }
 
+/* Main grid area - fills remaining space */
 .grid-wrapper {
-    overflow-x: auto;
+    flex: 1;
+    overflow: auto;
     background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    padding: 16px;
 }
 
 .spreadsheet {
@@ -72,7 +87,7 @@ h1 {
     min-width: fit-content;
 }
 
-/* Header cells (A-J and row numbers) */
+/* Header cells (A-Z and row numbers) */
 .header-cell {
     background-color: #f8f9fa;
     border: 1px solid #e0e0e0;
@@ -80,14 +95,32 @@ h1 {
     text-align: center;
     font-weight: 500;
     color: #666;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     user-select: none;
+    position: sticky;
+    z-index: 2;
 }
 
-/* Corner cell (top-left empty) */
+/* Column headers stick to top */
+.header-cell.col-header {
+    top: 0;
+    z-index: 3;
+}
+
+/* Row headers stick to left */
+.header-cell.row-header {
+    left: 0;
+    z-index: 2;
+}
+
+/* Corner cell (top-left) */
 .corner-cell {
     background-color: #f8f9fa;
     border: 1px solid #e0e0e0;
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 4;
 }
 
 /* Data cells */
@@ -105,55 +138,56 @@ h1 {
 .cell input {
     width: 100%;
     height: 100%;
-    min-height: 36px;
-    padding: 8px;
+    min-height: 32px;
+    padding: 6px 8px;
     border: none;
     outline: none;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     font-family: inherit;
     background: transparent;
 }
 
 .cell input:focus {
-    background-color: #f0f7ff;
+    background-color: #e8f4fc;
 }
 
 .cell:has(input:focus) {
     border-color: #4a90d9;
-    box-shadow: 0 0 0 1px #4a90d9;
+    box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.3);
     z-index: 2;
     position: relative;
 }
 
+/* Footer hint */
 .hint {
-    margin-top: 16px;
+    padding: 8px 16px;
     color: #888;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
+    background: #fafafa;
+    border-top: 1px solid #e0e0e0;
+    flex-shrink: 0;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    body {
-        padding: 10px;
+    .header {
+        padding: 8px 12px;
+        flex-wrap: wrap;
+        gap: 8px;
     }
 
-    h1 {
-        font-size: 1.25rem;
-        margin-bottom: 12px;
+    .header h1 {
+        font-size: 1rem;
     }
 
     .toolbar {
-        flex-wrap: wrap;
+        order: 1;
+        width: 100%;
     }
 
     .toolbar button {
-        padding: 6px 12px;
+        padding: 6px 10px;
         font-size: 0.75rem;
-    }
-
-    .grid-wrapper {
-        padding: 8px;
-        border-radius: 4px;
     }
 
     .header-cell {
@@ -168,6 +202,7 @@ h1 {
     }
 
     .hint {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
+        padding: 6px 12px;
     }
 }
