@@ -21,6 +21,9 @@
     // Data model - dynamic 2D array
     let data = createEmptyData(rows, cols);
 
+    // Formula storage - parallel array to data
+    let formulas = createEmptyData(rows, cols);
+
     // Debounce timer
     let debounceTimer = null;
 
@@ -33,6 +36,12 @@
     let selectionEnd = null;    // { row, col } current end
     let isSelecting = false;    // true during mouse drag
 
+    // Formula range selection mode (for clicking to select ranges like Google Sheets)
+    let formulaEditMode = false;       // true when typing a formula
+    let formulaEditCell = null;        // { row, col, element } of cell being edited
+    let formulaRangeStart = null;      // Start of range being selected
+    let formulaRangeEnd = null;        // End of range being selected
+
     // Create empty data array with specified dimensions
     function createEmptyData(r, c) {
         return Array(r).fill(null).map(() => Array(c).fill(''));
@@ -43,6 +52,137 @@
         return String.fromCharCode(65 + col);
     }
 
+    // ========== Formula Helper Functions ==========
+
+    // Convert column letter(s) to index: A=0, B=1, ..., O=14
+    function letterToCol(letters) {
+        letters = letters.toUpperCase();
+        let col = 0;
+        for (let i = 0; i < letters.length; i++) {
+            col = col * 26 + (letters.charCodeAt(i) - 64);
+        }
+        return col - 1;
+    }
+
+    // Parse cell reference "A1" → { row: 0, col: 0 }
+    function parseCellRef(ref) {
+        const match = ref.toUpperCase().match(/^([A-Z]+)(\d+)$/);
+        if (!match) return null;
+        return {
+            col: letterToCol(match[1]),
+            row: parseInt(match[2], 10) - 1
+        };
+    }
+
+    // Parse range "A1:B5" → { startRow, startCol, endRow, endCol }
+    function parseRange(range) {
+        const parts = range.split(':');
+        if (parts.length !== 2) return null;
+        const start = parseCellRef(parts[0].trim());
+        const end = parseCellRef(parts[1].trim());
+        if (!start || !end) return null;
+        return {
+            startRow: Math.min(start.row, end.row),
+            startCol: Math.min(start.col, end.col),
+            endRow: Math.max(start.row, end.row),
+            endCol: Math.max(start.col, end.col)
+        };
+    }
+
+    // Build cell reference string like "A1"
+    function buildCellRef(row, col) {
+        return colToLetter(col) + (row + 1);
+    }
+
+    // Build range reference string like "A1:B5"
+    function buildRangeRef(startRow, startCol, endRow, endCol) {
+        const minRow = Math.min(startRow, endRow);
+        const maxRow = Math.max(startRow, endRow);
+        const minCol = Math.min(startCol, endCol);
+        const maxCol = Math.max(startCol, endCol);
+
+        if (minRow === maxRow && minCol === maxCol) {
+            // Single cell
+            return buildCellRef(minRow, minCol);
+        }
+        return buildCellRef(minRow, minCol) + ':' + buildCellRef(maxRow, maxCol);
+    }
+
+    // Insert text at current cursor position in contentEditable
+    function insertTextAtCursor(text) {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+
+        // Move cursor after inserted text
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    // ========== Formula Evaluation Functions ==========
+
+    // Get numeric value from cell (returns 0 for empty/non-numeric)
+    function getCellValue(row, col) {
+        if (row < 0 || row >= rows || col < 0 || col >= cols) return 0;
+        const val = data[row][col];
+        if (!val || val === '') return 0;
+        // Strip HTML tags and parse
+        const stripped = String(val).replace(/<[^>]*>/g, '').trim();
+        const num = parseFloat(stripped);
+        return isNaN(num) ? 0 : num;
+    }
+
+    // Evaluate SUM(range)
+    function evaluateSUM(rangeStr) {
+        const range = parseRange(rangeStr);
+        if (!range) return '#REF!';
+
+        // Check if range is within grid bounds
+        if (range.endRow >= rows || range.endCol >= cols) return '#REF!';
+
+        let sum = 0;
+        for (let r = range.startRow; r <= range.endRow; r++) {
+            for (let c = range.startCol; c <= range.endCol; c++) {
+                sum += getCellValue(r, c);
+            }
+        }
+        return sum;
+    }
+
+    // Main formula evaluator
+    function evaluateFormula(formula) {
+        if (!formula || !formula.startsWith('=')) return formula;
+
+        const expr = formula.substring(1).trim().toUpperCase();
+
+        // Match SUM(range)
+        const sumMatch = expr.match(/^SUM\(([A-Z]+\d+:[A-Z]+\d+)\)$/);
+        if (sumMatch) {
+            return evaluateSUM(sumMatch[1]);
+        }
+
+        // Unknown formula
+        return '#ERROR!';
+    }
+
+    // Recalculate all formula cells
+    function recalculateFormulas() {
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (formulas[r][c] && formulas[r][c].startsWith('=')) {
+                    data[r][c] = String(evaluateFormula(formulas[r][c]));
+                }
+            }
+        }
+    }
+
     // Get current theme
     function isDarkMode() {
         return document.body.classList.contains('dark-mode');
@@ -50,7 +190,13 @@
 
     // Encode state to URL-safe string (includes dimensions and theme)
     function encodeState() {
-        const state = { rows, cols, data, theme: isDarkMode() ? 'dark' : 'light' };
+        const state = {
+            rows,
+            cols,
+            data,
+            formulas,
+            theme: isDarkMode() ? 'dark' : 'light'
+        };
         const json = JSON.stringify(state);
         return encodeURIComponent(json);
     }
@@ -89,7 +235,27 @@
                     d = createEmptyData(r, c);
                 }
 
-                return { rows: r, cols: c, data: d, theme: parsed.theme || null };
+                // Load formulas (backward compatible - create empty if not present)
+                let f = parsed.formulas;
+                if (Array.isArray(f)) {
+                    f = f.slice(0, r).map(row => {
+                        if (Array.isArray(row)) {
+                            return row.slice(0, c).map(cell => String(cell || ''));
+                        }
+                        return Array(c).fill('');
+                    });
+                    while (f.length < r) {
+                        f.push(Array(c).fill(''));
+                    }
+                    f = f.map(row => {
+                        while (row.length < c) row.push('');
+                        return row;
+                    });
+                } else {
+                    f = createEmptyData(r, c);
+                }
+
+                return { rows: r, cols: c, data: d, formulas: f, theme: parsed.theme || null };
             }
 
             // Handle legacy format (just array, assume 10x10)
@@ -103,7 +269,8 @@
                 while (d.length < DEFAULT_ROWS) {
                     d.push(Array(DEFAULT_COLS).fill(''));
                 }
-                return { rows: DEFAULT_ROWS, cols: DEFAULT_COLS, data: d, theme: null };
+                const f = createEmptyData(DEFAULT_ROWS, DEFAULT_COLS);
+                return { rows: DEFAULT_ROWS, cols: DEFAULT_COLS, data: d, formulas: f, theme: null };
             }
         } catch (e) {
             console.warn('Failed to decode state from URL:', e);
@@ -227,14 +394,36 @@
         const row = parseInt(target.dataset.row, 10);
         const col = parseInt(target.dataset.col, 10);
 
-        // Clear multi-selection when user starts typing
-        if (hasMultiSelection()) {
+        // DON'T clear selection if in formula mode (user may be selecting range)
+        if (hasMultiSelection() && !formulaEditMode) {
             clearSelection();
             setActiveHeaders(row, col);
         }
 
         if (!isNaN(row) && !isNaN(col) && row < rows && col < cols) {
-            data[row][col] = target.innerHTML;
+            const rawValue = target.innerText.trim();
+
+            if (rawValue.startsWith('=')) {
+                // Enter formula edit mode
+                formulaEditMode = true;
+                formulaEditCell = { row, col, element: target };
+
+                // Store formula but DON'T evaluate during typing
+                formulas[row][col] = rawValue;
+                data[row][col] = rawValue;
+            } else {
+                // Exit formula edit mode
+                formulaEditMode = false;
+                formulaEditCell = null;
+
+                // Regular value - clear any existing formula
+                formulas[row][col] = '';
+                data[row][col] = target.innerHTML;
+
+                // Recalculate dependent formulas when regular values change
+                recalculateFormulas();
+            }
+
             debouncedUpdateURL();
         }
     }
@@ -406,11 +595,47 @@
         if (!hasMultiSelection()) {
             setActiveHeaders(row, col);
         }
+
+        // Show formula text when focused (for editing)
+        if (formulas[row][col] && formulas[row][col].startsWith('=')) {
+            target.innerText = formulas[row][col];
+        }
     }
 
     function handleFocusOut(event) {
         const target = event.target;
         if (!target.classList.contains('cell-content')) return;
+
+        const row = parseInt(target.dataset.row, 10);
+        const col = parseInt(target.dataset.col, 10);
+
+        // If we're in formula edit mode and currently selecting a range, don't process blur
+        if (formulaEditMode && isSelecting) {
+            return;
+        }
+
+        // Evaluate formula when blurred
+        if (!isNaN(row) && !isNaN(col)) {
+            const rawValue = target.innerText.trim();
+
+            if (rawValue.startsWith('=')) {
+                // NOW evaluate the formula
+                formulas[row][col] = rawValue;
+                const result = evaluateFormula(rawValue);
+                data[row][col] = String(result);
+                target.innerText = String(result);
+
+                // Recalculate all dependent formulas
+                recalculateFormulas();
+                debouncedUpdateURL();
+            }
+        }
+
+        // Exit formula edit mode when focus truly leaves
+        formulaEditMode = false;
+        formulaEditCell = null;
+        formulaRangeStart = null;
+        formulaRangeEnd = null;
 
         const container = document.getElementById('spreadsheet');
         if (!container) return;
@@ -450,6 +675,31 @@
 
         const container = document.getElementById('spreadsheet');
 
+        // If in formula edit mode and clicking on a different cell
+        if (formulaEditMode && formulaEditCell) {
+            // Don't process clicks on the formula cell itself
+            if (row !== formulaEditCell.row || col !== formulaEditCell.col) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                // Start range selection for formula
+                formulaRangeStart = { row, col };
+                formulaRangeEnd = { row, col };
+                isSelecting = true;
+
+                // Show visual selection
+                selectionStart = formulaRangeStart;
+                selectionEnd = formulaRangeEnd;
+                updateSelectionVisuals();
+
+                if (container) {
+                    container.classList.add('selecting');
+                }
+
+                return;
+            }
+        }
+
         // Shift+click: extend selection from anchor
         if (event.shiftKey && selectionStart) {
             selectionEnd = { row, col };
@@ -481,6 +731,15 @@
             return;
         }
 
+        // If in formula edit mode, update formula range
+        if (formulaEditMode && formulaRangeStart) {
+            formulaRangeEnd = cellCoords;
+            selectionEnd = cellCoords;
+            updateSelectionVisuals();
+            event.preventDefault();
+            return;
+        }
+
         selectionEnd = cellCoords;
         updateSelectionVisuals();
 
@@ -496,6 +755,35 @@
         const container = document.getElementById('spreadsheet');
         if (container) {
             container.classList.remove('selecting');
+        }
+
+        // If in formula edit mode, insert the range reference
+        if (formulaEditMode && formulaEditCell && formulaRangeStart) {
+            const rangeRef = buildRangeRef(
+                formulaRangeStart.row, formulaRangeStart.col,
+                formulaRangeEnd.row, formulaRangeEnd.col
+            );
+
+            // Focus back on formula cell and insert range
+            formulaEditCell.element.focus();
+
+            // Use setTimeout to ensure focus is established before inserting
+            setTimeout(function() {
+                insertTextAtCursor(rangeRef);
+
+                // Update stored formula
+                formulas[formulaEditCell.row][formulaEditCell.col] = formulaEditCell.element.innerText;
+                data[formulaEditCell.row][formulaEditCell.col] = formulaEditCell.element.innerText;
+
+                // Clear formula range selection but stay in formula edit mode
+                formulaRangeStart = null;
+                formulaRangeEnd = null;
+                clearSelection();
+
+                debouncedUpdateURL();
+            }, 0);
+
+            return;
         }
 
         // If single cell selected, allow normal focus behavior
@@ -515,6 +803,51 @@
         if (event.key === 'Escape' && hasMultiSelection()) {
             clearSelection();
             event.preventDefault();
+            return;
+        }
+
+        // Enter key: evaluate formula / move to cell below
+        if (event.key === 'Enter') {
+            const target = event.target;
+            if (!target.classList.contains('cell-content')) return;
+
+            const row = parseInt(target.dataset.row, 10);
+            const col = parseInt(target.dataset.col, 10);
+
+            if (isNaN(row) || isNaN(col)) return;
+
+            // Prevent default newline behavior
+            event.preventDefault();
+
+            // Check if this is a formula cell - evaluate it
+            const rawValue = target.innerText.trim();
+            if (rawValue.startsWith('=')) {
+                formulas[row][col] = rawValue;
+                const result = evaluateFormula(rawValue);
+                data[row][col] = String(result);
+                target.innerText = String(result);
+                recalculateFormulas();
+                debouncedUpdateURL();
+
+                // Exit formula edit mode
+                formulaEditMode = false;
+                formulaEditCell = null;
+            }
+
+            // Try to move to cell below
+            const nextRow = row + 1;
+            if (nextRow < rows) {
+                // Focus cell below
+                const nextCell = document.querySelector(
+                    `.cell-content[data-row="${nextRow}"][data-col="${col}"]`
+                );
+                if (nextCell) {
+                    nextCell.focus();
+                }
+            } else {
+                // No row below - just blur current cell
+                target.blur();
+            }
         }
     }
 
@@ -622,6 +955,7 @@
         rows = DEFAULT_ROWS;
         cols = DEFAULT_COLS;
         data = createEmptyData(rows, cols);
+        formulas = createEmptyData(rows, cols);
 
         // Clear any selection
         clearSelection();
@@ -636,6 +970,7 @@
         if (rows >= MAX_ROWS) return;
         rows++;
         data.push(Array(cols).fill(''));
+        formulas.push(Array(cols).fill(''));
         renderGrid();
         debouncedUpdateURL();
     }
@@ -645,6 +980,7 @@
         if (cols >= MAX_COLS) return;
         cols++;
         data.forEach(row => row.push(''));
+        formulas.forEach(row => row.push(''));
         renderGrid();
         debouncedUpdateURL();
     }
@@ -659,6 +995,7 @@
                 rows = loadedState.rows;
                 cols = loadedState.cols;
                 data = loadedState.data;
+                formulas = loadedState.formulas || createEmptyData(rows, cols);
 
                 // Apply theme from URL if present
                 if (loadedState.theme) {
@@ -672,6 +1009,7 @@
         rows = DEFAULT_ROWS;
         cols = DEFAULT_COLS;
         data = createEmptyData(rows, cols);
+        formulas = createEmptyData(rows, cols);
     }
 
     // Toggle dark/light mode
