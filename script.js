@@ -538,6 +538,112 @@
         URL.revokeObjectURL(url);
     }
 
+    function parseCSV(text) {
+        if (!text) return [];
+
+        const rows = [];
+        let row = [];
+        let field = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+
+            if (inQuotes) {
+                if (char === '"') {
+                    if (text[i + 1] === '"') {
+                        field += '"';
+                        i++;
+                    } else {
+                        inQuotes = false;
+                    }
+                } else {
+                    field += char;
+                }
+                continue;
+            }
+
+            if (char === '"') {
+                inQuotes = true;
+            } else if (char === ',') {
+                row.push(field);
+                field = '';
+            } else if (char === '\r') {
+                if (text[i + 1] === '\n') {
+                    i++;
+                }
+                row.push(field);
+                rows.push(row);
+                row = [];
+                field = '';
+            } else if (char === '\n') {
+                row.push(field);
+                rows.push(row);
+                row = [];
+                field = '';
+            } else {
+                field += char;
+            }
+        }
+
+        row.push(field);
+        rows.push(row);
+
+        if (rows.length && rows[0].length && rows[0][0]) {
+            rows[0][0] = rows[0][0].replace(/^\uFEFF/, '');
+        }
+
+        if (/\r?\n$/.test(text)) {
+            const lastRow = rows[rows.length - 1];
+            if (lastRow && lastRow.length === 1 && lastRow[0] === '') {
+                rows.pop();
+            }
+        }
+
+        return rows;
+    }
+
+    function importCSVText(text) {
+        const parsedRows = parseCSV(text);
+        if (!parsedRows.length) {
+            alert('CSV file is empty.');
+            return;
+        }
+
+        const maxCols = parsedRows.reduce((max, row) => Math.max(max, row.length), 0);
+        const nextRows = Math.min(Math.max(parsedRows.length, 1), MAX_ROWS);
+        const nextCols = Math.min(Math.max(maxCols, 1), MAX_COLS);
+
+        const truncated = parsedRows.length > MAX_ROWS || maxCols > MAX_COLS;
+
+        rows = nextRows;
+        cols = nextCols;
+        data = createEmptyData(rows, cols);
+        formulas = createEmptyData(rows, cols);
+        cellStyles = createEmptyCellStyles(rows, cols);
+
+        for (let r = 0; r < rows; r++) {
+            const sourceRow = Array.isArray(parsedRows[r]) ? parsedRows[r] : [];
+            for (let c = 0; c < cols; c++) {
+                const raw = sourceRow[c] !== undefined ? String(sourceRow[c]) : '';
+                if (raw.startsWith('=')) {
+                    formulas[r][c] = raw;
+                    data[r][c] = raw;
+                } else {
+                    data[r][c] = raw;
+                }
+            }
+        }
+
+        renderGrid();
+        recalculateFormulas();
+        debouncedUpdateURL();
+
+        if (truncated) {
+            alert('CSV exceeded the max size (30 rows x 15 columns). Extra data was truncated.');
+        }
+    }
+
     // Encode state to URL-safe string (includes dimensions and theme)
     function encodeState() {
         const state = {
@@ -1978,6 +2084,8 @@
         const clearBtn = document.getElementById('clear-spreadsheet');
         const themeToggleBtn = document.getElementById('theme-toggle');
         const copyUrlBtn = document.getElementById('copy-url');
+        const importCsvBtn = document.getElementById('import-csv');
+        const importCsvInput = document.getElementById('import-csv-file');
         const exportCsvBtn = document.getElementById('export-csv');
 
         if (addRowBtn) {
@@ -1994,6 +2102,27 @@
         }
         if (copyUrlBtn) {
             copyUrlBtn.addEventListener('click', copyURL);
+        }
+        if (importCsvBtn && importCsvInput) {
+            importCsvBtn.addEventListener('click', function() {
+                importCsvInput.click();
+            });
+        }
+        if (importCsvInput) {
+            importCsvInput.addEventListener('change', function(e) {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function() {
+                    importCSVText(String(reader.result || ''));
+                };
+                reader.onerror = function() {
+                    alert('Failed to read the CSV file.');
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+            });
         }
         if (exportCsvBtn) {
             exportCsvBtn.addEventListener('click', downloadCSV);
