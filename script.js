@@ -17,6 +17,7 @@
         { name: 'SUM', signature: 'SUM(range)', description: 'Adds numbers in a range' },
         { name: 'AVG', signature: 'AVG(range)', description: 'Average of numbers in a range' }
     ];
+    const FONT_SIZE_OPTIONS = [10, 12, 14, 16, 18, 24];
 
     // Dynamic dimensions
     let rows = DEFAULT_ROWS;
@@ -28,7 +29,7 @@
     // Formula storage - parallel array to data
     let formulas = createEmptyData(rows, cols);
 
-    // Cell styles - alignment and background color
+    // Cell styles - alignment, colors, and font size
     let cellStyles = createEmptyCellStyles(rows, cols);
 
     // Debounce timer
@@ -59,9 +60,13 @@
         return Array(r).fill(null).map(() => Array(c).fill(''));
     }
 
+    function createEmptyCellStyle() {
+        return { align: '', bg: '', color: '', fontSize: '' };
+    }
+
     function createEmptyCellStyles(r, c) {
         return Array(r).fill(null).map(() =>
-            Array(c).fill(null).map(() => ({ align: '', bg: '', color: '' }))
+            Array(c).fill(null).map(() => createEmptyCellStyle())
         );
     }
 
@@ -454,6 +459,19 @@
         return '';
     }
 
+    function normalizeFontSize(value) {
+        if (value === null || value === undefined) return '';
+        let raw = String(value).trim();
+        if (raw === '') return '';
+        if (raw.endsWith('px')) {
+            raw = raw.slice(0, -2).trim();
+        }
+        const size = parseInt(raw, 10);
+        if (isNaN(size)) return '';
+        if (!FONT_SIZE_OPTIONS.includes(size)) return '';
+        return String(size);
+    }
+
     function normalizeCellStyles(styles, r, c) {
         const normalized = createEmptyCellStyles(r, c);
         if (!Array.isArray(styles)) return normalized;
@@ -466,7 +484,8 @@
                     normalized[row][col] = {
                         align: normalizeAlignment(cellStyle.align),
                         bg: typeof cellStyle.bg === 'string' ? cellStyle.bg : '',
-                        color: typeof cellStyle.color === 'string' ? cellStyle.color : ''
+                        color: typeof cellStyle.color === 'string' ? cellStyle.color : '',
+                        fontSize: normalizeFontSize(cellStyle.fontSize)
                     };
                 }
             }
@@ -678,6 +697,7 @@
                 if (style) {
                     contentDiv.style.textAlign = style.align || '';
                     contentDiv.style.color = style.color || '';
+                    contentDiv.style.fontSize = style.fontSize ? `${style.fontSize}px` : '';
                     if (style.bg) {
                         cell.style.setProperty('--cell-bg', style.bg);
                     } else {
@@ -686,6 +706,7 @@
                 } else {
                     contentDiv.style.textAlign = '';
                     contentDiv.style.color = '';
+                    contentDiv.style.fontSize = '';
                     cell.style.removeProperty('--cell-bg');
                 }
 
@@ -1390,7 +1411,7 @@
 
         const updated = forEachTargetCell(function(row, col) {
             if (!cellStyles[row]) cellStyles[row] = [];
-            if (!cellStyles[row][col]) cellStyles[row][col] = { align: '', bg: '', color: '' };
+            if (!cellStyles[row][col]) cellStyles[row][col] = createEmptyCellStyle();
             cellStyles[row][col].align = normalized;
 
             const cellContent = getCellContentElement(row, col);
@@ -1409,7 +1430,7 @@
 
         const updated = forEachTargetCell(function(row, col) {
             if (!cellStyles[row]) cellStyles[row] = [];
-            if (!cellStyles[row][col]) cellStyles[row][col] = { align: '', bg: '', color: '' };
+            if (!cellStyles[row][col]) cellStyles[row][col] = createEmptyCellStyle();
             cellStyles[row][col].bg = color;
 
             const cell = getCellElement(row, col);
@@ -1432,12 +1453,31 @@
 
         const updated = forEachTargetCell(function(row, col) {
             if (!cellStyles[row]) cellStyles[row] = [];
-            if (!cellStyles[row][col]) cellStyles[row][col] = { align: '', bg: '', color: '' };
+            if (!cellStyles[row][col]) cellStyles[row][col] = createEmptyCellStyle();
             cellStyles[row][col].color = color;
 
             const cellContent = getCellContentElement(row, col);
             if (cellContent) {
                 cellContent.style.color = color;
+            }
+        });
+
+        if (updated) {
+            debouncedUpdateURL();
+        }
+    }
+
+    function applyFontSize(size) {
+        const normalized = normalizeFontSize(size);
+
+        const updated = forEachTargetCell(function(row, col) {
+            if (!cellStyles[row]) cellStyles[row] = [];
+            if (!cellStyles[row][col]) cellStyles[row][col] = createEmptyCellStyle();
+            cellStyles[row][col].fontSize = normalized;
+
+            const cellContent = getCellContentElement(row, col);
+            if (cellContent) {
+                cellContent.style.fontSize = normalized ? `${normalized}px` : '';
             }
         });
 
@@ -1498,7 +1538,7 @@
         rows++;
         data.push(Array(cols).fill(''));
         formulas.push(Array(cols).fill(''));
-        cellStyles.push(Array(cols).fill(null).map(() => ({ align: '', bg: '', color: '' })));
+        cellStyles.push(Array(cols).fill(null).map(() => createEmptyCellStyle()));
         renderGrid();
         debouncedUpdateURL();
     }
@@ -1509,7 +1549,7 @@
         cols++;
         data.forEach(row => row.push(''));
         formulas.forEach(row => row.push(''));
-        cellStyles.forEach(row => row.push({ align: '', bg: '', color: '' }));
+        cellStyles.forEach(row => row.push(createEmptyCellStyle()));
         renderGrid();
         debouncedUpdateURL();
     }
@@ -1684,6 +1724,7 @@
         const alignRightBtn = document.getElementById('align-right');
         const cellBgPicker = document.getElementById('cell-bg-color');
         const cellTextColorPicker = document.getElementById('cell-text-color');
+        const fontSizeSelect = document.getElementById('font-size');
 
         if (boldBtn) {
             boldBtn.addEventListener('mousedown', function(e) {
@@ -1729,6 +1770,11 @@
         if (cellTextColorPicker) {
             cellTextColorPicker.addEventListener('input', function(e) {
                 applyCellTextColor(e.target.value);
+            });
+        }
+        if (fontSizeSelect) {
+            fontSizeSelect.addEventListener('change', function(e) {
+                applyFontSize(e.target.value);
             });
         }
 
