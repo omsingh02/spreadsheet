@@ -760,13 +760,20 @@
         }
 
         const json = JSON.stringify(state);
-        return encodeURIComponent(json);
+        return LZString.compressToEncodedURIComponent(json);
     }
 
     // Decode URL hash to state object
     function decodeState(hash) {
         try {
-            const decoded = decodeURIComponent(hash);
+            // Try LZ-String decompression first (new format)
+            let decoded = LZString.decompressFromEncodedURIComponent(hash);
+
+            // Fall back to legacy URL-encoded format if decompression fails
+            if (!decoded) {
+                decoded = decodeURIComponent(hash);
+            }
+
             const parsed = JSON.parse(decoded);
 
             // Handle new format (object with rows, cols, data)
