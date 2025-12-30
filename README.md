@@ -6,21 +6,26 @@ A lightweight, client-only spreadsheet web application. All data persists in the
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Vanilla JS](https://img.shields.io/badge/vanilla-JavaScript-yellow.svg)
-![No Dependencies](https://img.shields.io/badge/dependencies-none-green.svg)
+![No Build Tools](https://img.shields.io/badge/build-none-brightgreen.svg)
 
 ## Features
 
 ### Core Functionality
 - **Zero Backend** - All state saved in URL hash, works completely offline
+- **Compressed URL State** - LZ-String compression keeps share links short
 - **Instant Sharing** - Copy URL to share your spreadsheet with anyone
 - **Dynamic Grid** - Expandable up to 30 rows and 15 columns (A-O)
 - **Arrow Key Navigation** - Move the active cell with arrow keys; Shift+Arrow expands selection
-- **Persistent State** - Browser back/forward buttons restore previous states
+- **Persistent History** - Browser back/forward buttons restore previous states
 
-### Text Formatting
+### Text & Cell Styling
 - **Bold** (Ctrl+B) - Apply bold formatting to selected text
 - **Italic** (Ctrl+I) - Apply italic formatting to selected text
 - **Underline** (Ctrl+U) - Apply underline formatting to selected text
+- **Alignment** - Left/center/right alignment per cell or selection
+- **Font Size** - Quick size buttons (Auto, 10-24px)
+- **Cell Colors** - Background and text color pickers
+- **Style Persistence** - Alignment, colors, and sizes saved in the URL
 - HTML-based formatting preserved in cell content
 
 ### Multi-Cell Selection (Google Sheets Style)
@@ -35,14 +40,21 @@ A lightweight, client-only spreadsheet web application. All data persists in the
 ### Grid Management
 - **Add Row** - Expand grid rows (max 30)
 - **Add Column** - Expand grid columns (max 15)
+- **Resize Rows/Columns** - Drag header handles to adjust sizes
 - **Clear Spreadsheet** - Reset to empty 10A-10 grid with confirmation
 - **Live Grid Size** - Display shows current dimensions
 
+### Data Import/Export
+- **CSV Import** - Load .csv files from the toolbar
+- **CSV Export** - Download the current grid as `spreadsheet.csv`
+- **Formula-aware Import** - Cells starting with `=` are treated as formulas
+
 ### Formula Support
-- **SUM Function** - Calculate totals with `=SUM(A1:B5)` syntax
+- **SUM / AVG Functions** - Calculate totals or averages with `=SUM(A1:B5)` / `=AVG(A1:B5)`
 - **Formula Autocomplete** - Dropdown suggestions appear when typing `=`
 - **Range Selection** - Click/drag cells while editing to insert range references
 - **Live Evaluation** - Formulas evaluate on Enter or when leaving the cell
+- **Recalculation** - Dependent formulas update when referenced cells change
 - **Error Handling** - Shows `#REF!` for invalid ranges, `#ERROR!` for unknown formulas
 - **Shareable Formulas** - Formulas preserved in URL for sharing
 
@@ -74,13 +86,24 @@ npx serve .
 
 ## How It Works
 
-Your spreadsheet data is stored entirely in the URL hash:
+Your spreadsheet state is stored entirely in the URL hash. The hash is LZ-String compressed JSON to keep links short, and only non-default data is included.
+
+Example state (decompressed):
 
 ```
-https://yoursite.com/spreadsheet/#{"rows":10,"cols":10,"data":[["A1","B1"],["A2","B2"]],"formulas":[[null,null],[null,"=SUM(A1:A2)"]],"theme":"light"}
+{
+  "rows": 2,
+  "cols": 2,
+  "data": [["A1", "B1"], ["A2", "B2"]],
+  "formulas": [["", "=SUM(A1:A2)"]],
+  "cellStyles": [[{"align": "center", "bg": "#f5f5f5", "color": "#111", "fontSize": "14"}]],
+  "colWidths": [120, 100],
+  "rowHeights": [32, 32],
+  "theme": "light"
+}
 ```
 
-When you edit cells, the URL updates automatically (debounced at 200ms). Formulas are stored separately from displayed values, so both the results and the original formulas are preserved. Share the URL with anyone - no account or database needed.
+When you edit cells, the URL updates automatically (debounced at 200ms). Formulas are stored separately from displayed values, so both the results and the original formulas are preserved. Column widths, row heights, and cell styles are saved too. Legacy uncompressed hashes are still supported.
 
 ## Usage
 
@@ -88,6 +111,10 @@ When you edit cells, the URL updates automatically (debounced at 200ms). Formula
 |--------|-----|
 | Edit cell | Double-click a cell or click and start typing |
 | Format text | Select text, click B/I/U buttons or use Ctrl+B/I/U |
+| Align text | Click left/center/right alignment buttons |
+| Set font size | Use size buttons (Auto, 10-24) |
+| Set cell colors | Use background/text color pickers |
+| Resize column/row | Drag header resize handles |
 | Navigate cells | Arrow keys (when not editing) |
 | Select range | Click and drag across cells |
 | Extend selection | Shift+Click or Shift+Arrow |
@@ -95,6 +122,8 @@ When you edit cells, the URL updates automatically (debounced at 200ms). Formula
 | Add row | Click "+ Row" button (max 30) |
 | Add column | Click "+ Column" button (max 15) |
 | Clear all | Click "Clear" button (with confirmation) |
+| Import CSV | Click import button and choose a .csv file |
+| Export CSV | Click download button |
 | Enter formula | Type `=` followed by function (e.g., `=SUM(A1:B5)`) |
 | Select formula range | Click/drag cells while editing a formula |
 | Share | Click copy button to copy URL |
@@ -119,7 +148,9 @@ When you edit cells, the URL updates automatically (debounced at 200ms). Formula
 - Vanilla HTML/CSS/JavaScript (no frameworks)
 - CSS Grid for spreadsheet layout
 - CSS Custom Properties for theming
+- LZ-String (URL state compression via CDN)
 - Font Awesome 6.5.1 (icons via CDN)
+- Google Analytics (gtag.js) for usage tracking
 - No build tools required
 
 ## Browser Support
@@ -139,7 +170,9 @@ When you edit cells, the URL updates automatically (debounced at 200ms). Formula
 - Maximum 30 rows
 - Maximum 15 columns (A-O)
 - Default grid: 10 rows x 10 columns
-- URL length limits may apply for very large spreadsheets
+- Formulas limited to SUM and AVG range syntax
+- CSV imports larger than 30x15 are truncated
+- URL length limits may apply for very large spreadsheets (compression helps)
 
 ## File Structure
 
@@ -148,16 +181,17 @@ spreadsheet/
 |-- index.html      # Single-page app structure
 |-- styles.css      # All styling including dark mode
 |-- script.js       # Application logic (IIFE module)
+|-- logo.png        # App logo
 |-- CLAUDE.md       # Development documentation
 `-- README.md       # This file
 ```
 
 ## Architecture
 
-- **State Management** - `data` (2D array), `rows`, `cols` variables
-- **URL Sync** - JSON serialization with debounced updates
+- **State Management** - `data`, `formulas`, `cellStyles`, `rows`, `cols`, `colWidths`, `rowHeights`
+- **URL Sync** - LZ-String compressed JSON with debounced updates and legacy fallback
 - **Event Delegation** - All cell events handled on container
-- **CSS Grid** - Dynamic column template set via JavaScript
+- **CSS Grid** - Dynamic column template and row heights set via JavaScript
 - **Sticky Headers** - Row/column headers with z-index layering
 
 ## Development
@@ -173,6 +207,13 @@ http://localhost:3000
 ```
 
 ## Recent Updates
+
+### Latest - Styling, CSV, and Compression
+- Added cell alignment, font sizing, and color controls (saved in URL)
+- Added column/row resizing with persistent sizes
+- Added CSV import/export (formulas recognized on import)
+- Added AVG formula support alongside SUM
+- URL hashes now use LZ-String compression with legacy fallback
 
 ### v1.4 - Keyboard Navigation
 - Arrow keys move the active selection without entering edit mode
