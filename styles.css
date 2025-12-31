@@ -582,23 +582,76 @@ body.resizing {
     opacity: 0.7;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .header {
-        padding: 8px 12px;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-
+/* Mobile/Tablet: Bottom toolbar with horizontal scroll */
+@media (max-width: 1024px) {
+    /* Hide title completely */
     .header h1 {
-        font-size: 1rem;
+        display: none;
     }
 
+    /* Fixed bottom toolbar */
+    .header {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        padding: 8px 12px;
+        border-top: 1px solid var(--border-color);
+        border-bottom: none;
+    }
+
+    /* Horizontal scrolling toolbar */
     .toolbar {
-        order: 1;
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 8px;
         width: 100%;
+        padding-bottom: 4px;
     }
 
+    /* Hide scrollbar */
+    .toolbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Prevent buttons from shrinking */
+    .toolbar button,
+    .toolbar select,
+    .toolbar .format-buttons,
+    .toolbar .toolbar-divider,
+    .toolbar input[type="color"] {
+        flex-shrink: 0;
+    }
+
+    /* Touch-friendly button sizes */
+    .toolbar button {
+        min-height: 44px;
+        padding: 8px 12px;
+    }
+
+    .format-buttons button {
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    /* Add bottom margin to grid for fixed toolbar */
+    .grid-wrapper {
+        margin-bottom: 70px;
+    }
+
+    /* Hide hint on mobile/tablet */
+    .hint {
+        display: none;
+    }
+}
+
+/* Responsive adjustments for smaller mobile */
+@media (max-width: 768px) {
     .toolbar button {
         padding: 6px 10px;
         font-size: 0.75rem;
@@ -613,10 +666,5 @@ body.resizing {
         min-height: 44px;
         padding: 6px;
         font-size: 16px; /* Prevents zoom on iOS */
-    }
-
-    .hint {
-        font-size: 0.7rem;
-        padding: 6px 12px;
     }
 }
