@@ -24,7 +24,34 @@
         { name: 'SUM', signature: 'SUM(range)', description: 'Adds numbers in a range' },
         { name: 'AVG', signature: 'AVG(range)', description: 'Average of numbers in a range' }
     ];
+
+    // Valid formula patterns (security whitelist)
+    const VALID_FORMULA_PATTERNS = [
+        /^=\s*SUM\s*\(\s*[A-Z]+\d+\s*:\s*[A-Z]+\d+\s*\)\s*$/i,
+        /^=\s*AVG\s*\(\s*[A-Z]+\d+\s*:\s*[A-Z]+\d+\s*\)\s*$/i
+    ];
+
+    // Validate formula matches allowed patterns (security: prevents arbitrary formula injection)
+    function isValidFormula(formula) {
+        if (!formula || typeof formula !== 'string') return false;
+        if (!formula.startsWith('=')) return false;
+        return VALID_FORMULA_PATTERNS.some(pattern => pattern.test(formula));
+    }
+
+    // Sanitize formula - returns the formula if valid, otherwise escapes it as text
+    function sanitizeFormula(formula) {
+        if (!formula || typeof formula !== 'string') return '';
+        if (!formula.startsWith('=')) return escapeHTML(formula);
+        // If it's a valid formula pattern, allow it
+        if (isValidFormula(formula)) return formula;
+        // Invalid formula - treat as text to prevent injection
+        return escapeHTML(formula);
+    }
     const FONT_SIZE_OPTIONS = [10, 12, 14, 16, 18, 24];
+
+    // Allowed HTML tags for sanitization (preserves basic formatting)
+    const ALLOWED_TAGS = ['B', 'I', 'U', 'STRONG', 'EM', 'SPAN', 'BR'];
+    const ALLOWED_SPAN_STYLES = ['font-weight', 'font-style', 'text-decoration', 'color', 'background-color'];
 
     // Dynamic dimensions
     let rows = DEFAULT_ROWS;
@@ -116,6 +143,152 @@
             }
         }
         return normalized;
+    }
+
+    // ========== Security Functions ==========
+
+    // Validate CSS color values to prevent CSS injection
+    function isValidCSSColor(color) {
+        if (color === null || color === undefined) return false;
+        if (typeof color !== 'string') return false;
+
+        // Allow empty string (to clear color)
+        if (color === '') return true;
+
+        // Validate hex colors (#RGB, #RRGGBB, #RRGGBBAA)
+        if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(color)) {
+            return true;
+        }
+
+        // Validate rgb/rgba with proper bounds
+        if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+)\s*)?\)$/.test(color)) {
+            return true;
+        }
+
+        // Reject anything else (prevents CSS injection)
+        return false;
+    }
+
+    // Escape HTML entities for safe display (converts HTML to plain text display)
+    function escapeHTML(str) {
+        if (!str || typeof str !== 'string') return '';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;');
+    }
+
+    // Filter safe CSS styles for span elements
+    function filterSafeStyles(styleString) {
+        if (!styleString) return '';
+        const safeStyles = [];
+        const parts = styleString.split(';');
+        for (const part of parts) {
+            const colonIndex = part.indexOf(':');
+            if (colonIndex === -1) continue;
+            const prop = part.substring(0, colonIndex).trim().toLowerCase();
+            if (ALLOWED_SPAN_STYLES.includes(prop)) {
+                safeStyles.push(part.trim());
+            }
+        }
+        return safeStyles.join('; ');
+    }
+
+    // Defense-in-depth: Check for dangerous patterns that might bypass sanitization
+    // Returns true if content appears safe, false if dangerous patterns detected
+    function isContentSafe(html) {
+        if (!html || typeof html !== 'string') return true;
+
+        // Dangerous patterns to reject (case-insensitive)
+        const dangerousPatterns = [
+            /<script/i,                          // Script tags
+            /javascript:/i,                       // JavaScript protocol
+            /on\w+\s*=/i,                        // Event handlers (onclick, onerror, etc.)
+            /data:\s*text\/html/i,               // Data URLs with HTML
+            /<iframe/i,                          // Iframes
+            /<object/i,                          // Object embeds
+            /<embed/i,                           // Embed tags
+            /<link/i,                            // Link tags (can load external resources)
+            /<meta/i,                            // Meta tags (can redirect)
+            /<base/i,                            // Base tag (can change URL resolution)
+            /expression\s*\(/i,                  // CSS expressions (IE)
+            /url\s*\(\s*["']?\s*javascript:/i    // JavaScript in CSS url()
+        ];
+
+        for (const pattern of dangerousPatterns) {
+            if (pattern.test(html)) {
+                console.warn('Blocked dangerous content pattern:', pattern.toString());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Sanitize HTML using DOMParser (does NOT execute scripts/event handlers)
+    function sanitizeHTML(html) {
+        if (!html || typeof html !== 'string') return '';
+
+        // Defense-in-depth: Pre-check for obviously dangerous patterns
+        if (!isContentSafe(html)) {
+            // Return escaped version instead of potentially dangerous content
+            return escapeHTML(html);
+        }
+
+        // Use DOMParser - it does NOT execute scripts or event handlers
+        const parser = new DOMParser();
+        const doc = parser.parseFromString('<body>' + html + '</body>', 'text/html');
+
+        function sanitizeNode(node) {
+            const childNodes = Array.from(node.childNodes);
+
+            for (const child of childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    continue;
+                }
+
+                if (child.nodeType === Node.ELEMENT_NODE) {
+                    const tagName = child.tagName.toUpperCase();
+
+                    if (!ALLOWED_TAGS.includes(tagName)) {
+                        // Replace disallowed tags with their text content
+                        const textNode = document.createTextNode(child.textContent || '');
+                        node.replaceChild(textNode, child);
+                    } else {
+                        // Remove all attributes except safe styles on SPAN
+                        const attrs = Array.from(child.attributes);
+                        for (const attr of attrs) {
+                            if (tagName === 'SPAN' && attr.name === 'style') {
+                                const safeStyle = filterSafeStyles(attr.value);
+                                if (safeStyle) {
+                                    child.setAttribute('style', safeStyle);
+                                } else {
+                                    child.removeAttribute('style');
+                                }
+                            } else {
+                                child.removeAttribute(attr.name);
+                            }
+                        }
+                        sanitizeNode(child);
+                    }
+                } else {
+                    // Remove comments and other node types
+                    node.removeChild(child);
+                }
+            }
+        }
+
+        sanitizeNode(doc.body);
+        const result = doc.body.innerHTML;
+
+        // Defense-in-depth: Final verification of sanitized output
+        if (!isContentSafe(result)) {
+            console.warn('Sanitized output still contains dangerous patterns, escaping');
+            return escapeHTML(html);
+        }
+
+        return result;
     }
 
     // Convert column index to letter (0 = A, 1 = B, ... 25 = Z)
@@ -531,8 +704,8 @@
                 if (cellStyle && typeof cellStyle === 'object') {
                     normalized[row][col] = {
                         align: normalizeAlignment(cellStyle.align),
-                        bg: typeof cellStyle.bg === 'string' ? cellStyle.bg : '',
-                        color: typeof cellStyle.color === 'string' ? cellStyle.color : '',
+                        bg: isValidCSSColor(cellStyle.bg) ? cellStyle.bg : '',
+                        color: isValidCSSColor(cellStyle.color) ? cellStyle.color : '',
                         fontSize: normalizeFontSize(cellStyle.fontSize)
                     };
                 }
@@ -543,9 +716,10 @@
 
     function extractPlainText(value) {
         if (value === null || value === undefined) return '';
-        const temp = document.createElement('div');
-        temp.innerHTML = String(value);
-        const text = temp.textContent || '';
+        // Use DOMParser for safe HTML parsing (doesn't execute scripts)
+        const parser = new DOMParser();
+        const doc = parser.parseFromString('<body>' + String(value) + '</body>', 'text/html');
+        const text = doc.body.textContent || '';
         return text.replace(/\u00a0/g, ' ');
     }
 
@@ -675,10 +849,18 @@
             for (let c = 0; c < cols; c++) {
                 const raw = sourceRow[c] !== undefined ? String(sourceRow[c]) : '';
                 if (raw.startsWith('=')) {
-                    formulas[r][c] = raw;
-                    data[r][c] = raw;
+                    // Security: Validate formula against whitelist before storing
+                    if (isValidFormula(raw)) {
+                        formulas[r][c] = raw;
+                        data[r][c] = raw;
+                    } else {
+                        // Invalid formula pattern - treat as escaped text
+                        formulas[r][c] = '';
+                        data[r][c] = escapeHTML(raw);
+                    }
                 } else {
-                    data[r][c] = raw;
+                    // Escape HTML in CSV values to prevent XSS
+                    data[r][c] = escapeHTML(raw);
                 }
             }
         }
@@ -763,18 +945,66 @@
         return LZString.compressToEncodedURIComponent(json);
     }
 
+    // Safe JSON parse with prototype pollution protection
+    // Creates safe copies using Object.create(null) to prevent prototype chain attacks
+    function safeJSONParse(jsonString) {
+        const parsed = JSON.parse(jsonString);
+
+        function createSafeCopy(obj) {
+            if (obj === null || typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) {
+                return obj.map(createSafeCopy);
+            }
+
+            const safe = Object.create(null);
+            for (const key of Object.keys(obj)) {
+                // Block dangerous keys that could pollute prototypes
+                if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                    console.warn('Blocked prototype pollution attempt via key:', key);
+                    continue;
+                }
+                // Block keys containing prototype chain accessor patterns
+                if (key.includes('__proto__') || key.includes('constructor.prototype')) {
+                    console.warn('Blocked prototype pollution attempt via key pattern:', key);
+                    continue;
+                }
+                safe[key] = createSafeCopy(obj[key]);
+            }
+            return safe;
+        }
+
+        return createSafeCopy(parsed);
+    }
+
     // Decode URL hash to state object
     function decodeState(hash) {
         try {
-            // Try LZ-String decompression first (new format)
-            let decoded = LZString.decompressFromEncodedURIComponent(hash);
-
-            // Fall back to legacy URL-encoded format if decompression fails
-            if (!decoded) {
-                decoded = decodeURIComponent(hash);
+            // Security: Reject extremely long hashes (potential DoS)
+            if (hash.length > 100000) {
+                console.warn('Hash too long, rejecting');
+                return null;
             }
 
-            const parsed = JSON.parse(decoded);
+            let decoded = null;
+
+            // Try LZ-String decompression first (new format)
+            decoded = LZString.decompressFromEncodedURIComponent(hash);
+
+            // If decompression returned null/empty, try legacy format
+            if (!decoded || decoded.length === 0) {
+                // Only attempt legacy decode if it looks like valid URL-encoded JSON
+                if (hash.startsWith('%7B') || hash.startsWith('%5B') ||
+                    hash.startsWith('{') || hash.startsWith('[')) {
+                    decoded = decodeURIComponent(hash);
+                } else {
+                    // Could be invalid/corrupted LZ-String - reject
+                    console.warn('Unrecognized hash format');
+                    return null;
+                }
+            }
+
+            // Use safe JSON parsing with prototype pollution protection
+            const parsed = safeJSONParse(decoded);
 
             // Handle new format (object with rows, cols, data)
             if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -787,7 +1017,7 @@
                     // Ensure correct dimensions
                     d = d.slice(0, r).map(row => {
                         if (Array.isArray(row)) {
-                            return row.slice(0, c).map(cell => String(cell || ''));
+                            return row.slice(0, c).map(cell => sanitizeHTML(String(cell || '')));
                         }
                         return Array(c).fill('');
                     });
@@ -805,11 +1035,25 @@
                 }
 
                 // Load formulas (backward compatible - create empty if not present)
+                // Security: Validate formulas against whitelist to prevent injection
                 let f = parsed.formulas;
                 if (Array.isArray(f)) {
-                    f = f.slice(0, r).map(row => {
+                    f = f.slice(0, r).map((row, rowIdx) => {
                         if (Array.isArray(row)) {
-                            return row.slice(0, c).map(cell => String(cell || ''));
+                            return row.slice(0, c).map((cell, colIdx) => {
+                                const formula = String(cell || '');
+                                if (formula.startsWith('=')) {
+                                    // Validate formula against whitelist
+                                    if (isValidFormula(formula)) {
+                                        return formula;
+                                    } else {
+                                        // Invalid formula - convert to escaped text in data
+                                        d[rowIdx][colIdx] = escapeHTML(formula);
+                                        return '';
+                                    }
+                                }
+                                return formula;
+                            });
                         }
                         return Array(c).fill('');
                     });
@@ -843,7 +1087,7 @@
             if (Array.isArray(parsed)) {
                 const d = parsed.slice(0, DEFAULT_ROWS).map(row => {
                     if (Array.isArray(row)) {
-                        return row.slice(0, DEFAULT_COLS).map(cell => String(cell || ''));
+                        return row.slice(0, DEFAULT_COLS).map(cell => sanitizeHTML(String(cell || '')));
                     }
                     return Array(DEFAULT_COLS).fill('');
                 });
@@ -990,7 +1234,7 @@
                 contentDiv.contentEditable = 'true';
                 contentDiv.dataset.row = row;
                 contentDiv.dataset.col = col;
-                contentDiv.innerHTML = data[row][col];
+                contentDiv.innerHTML = sanitizeHTML(data[row][col]);
                 contentDiv.setAttribute('aria-label', `Cell ${colToLetter(col)}${row + 1}`);
 
                 const style = cellStyles[row][col];
@@ -1053,7 +1297,7 @@
 
                 // Regular value - clear any existing formula
                 formulas[row][col] = '';
-                data[row][col] = target.innerHTML;
+                data[row][col] = sanitizeHTML(target.innerHTML);
 
                 hideFormulaDropdown();
 
@@ -1927,7 +2171,7 @@
     }
 
     function applyCellBackground(color) {
-        if (typeof color !== 'string') return;
+        if (!isValidCSSColor(color)) return;
 
         const updated = forEachTargetCell(function(row, col) {
             if (!cellStyles[row]) cellStyles[row] = [];
@@ -1950,7 +2194,7 @@
     }
 
     function applyCellTextColor(color) {
-        if (typeof color !== 'string') return;
+        if (!isValidCSSColor(color)) return;
 
         const updated = forEachTargetCell(function(row, col) {
             if (!cellStyles[row]) cellStyles[row] = [];
@@ -1987,18 +2231,52 @@
         }
     }
 
-    // Apply text formatting using execCommand
+    // Apply text formatting using modern Selection/Range API (replaces deprecated execCommand)
     function applyFormat(command) {
-        document.execCommand(command, false, null);
-        // Update data after formatting
+        const selection = window.getSelection();
+        if (!selection || !selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0);
+        const selectedText = range.toString();
+        if (!selectedText) return;
+
+        // Create wrapper element based on command
+        let wrapper;
+        switch (command) {
+            case 'bold':
+                wrapper = document.createElement('b');
+                break;
+            case 'italic':
+                wrapper = document.createElement('i');
+                break;
+            case 'underline':
+                wrapper = document.createElement('u');
+                break;
+            default:
+                return;
+        }
+
+        // Only proceed if selection is within a cell-content element
         const activeElement = document.activeElement;
-        if (activeElement && activeElement.classList.contains('cell-content')) {
-            const row = parseInt(activeElement.dataset.row, 10);
-            const col = parseInt(activeElement.dataset.col, 10);
-            if (!isNaN(row) && !isNaN(col) && row < rows && col < cols) {
-                data[row][col] = activeElement.innerHTML;
-                debouncedUpdateURL();
-            }
+        if (!activeElement || !activeElement.classList.contains('cell-content')) return;
+
+        try {
+            // Wrap the selected content
+            range.surroundContents(wrapper);
+        } catch (e) {
+            // surroundContents fails if selection crosses element boundaries
+            // Fall back to extracting and re-inserting
+            const fragment = range.extractContents();
+            wrapper.appendChild(fragment);
+            range.insertNode(wrapper);
+        }
+
+        // Update data after formatting
+        const row = parseInt(activeElement.dataset.row, 10);
+        const col = parseInt(activeElement.dataset.col, 10);
+        if (!isNaN(row) && !isNaN(col) && row < rows && col < cols) {
+            data[row][col] = sanitizeHTML(activeElement.innerHTML);
+            debouncedUpdateURL();
         }
     }
 
