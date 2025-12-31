@@ -1746,6 +1746,33 @@
         container.classList.remove('selecting');
     }
 
+    // Clear content of all selected cells
+    function clearSelectedCells() {
+        if (!selectionStart || !selectionEnd) return;
+
+        const bounds = getSelectionBounds();
+        const container = document.getElementById('spreadsheet');
+
+        for (let r = bounds.minRow; r <= bounds.maxRow; r++) {
+            for (let c = bounds.minCol; c <= bounds.maxCol; c++) {
+                // Clear data and formula
+                data[r][c] = '';
+                formulas[r][c] = '';
+
+                // Update DOM
+                const cell = container.querySelector(
+                    `.cell-content[data-row="${r}"][data-col="${c}"]`
+                );
+                if (cell) {
+                    cell.innerHTML = '';
+                }
+            }
+        }
+
+        recalculateFormulas();
+        debouncedUpdateURL();
+    }
+
     // Highlight headers for a range
     function setActiveHeadersForRange(minRow, maxRow, minCol, maxCol) {
         // Clear existing header highlights
@@ -2316,6 +2343,21 @@
             clearSelection();
             event.preventDefault();
             return;
+        }
+
+        // Delete/Backspace key clears selected cells
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+            const activeElement = document.activeElement;
+            const isEditingContent = activeElement &&
+                activeElement.classList.contains('cell-content') &&
+                activeElement.innerText.length > 0;
+
+            // Clear all cells if multi-selection, or clear single cell if not actively editing
+            if (hasMultiSelection() || !isEditingContent) {
+                event.preventDefault();
+                clearSelectedCells();
+                return;
+            }
         }
 
         // Enter key: evaluate formula / move to cell below
