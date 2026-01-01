@@ -112,8 +112,18 @@
         <div class="grid-wrapper">
             <div id="spreadsheet" class="spreadsheet"></div>
         </div>
-        <div class="hint"><i class="fa-solid fa-link"></i> Data is saved in the URL - share the link to share your
-            spreadsheet</div>
+        <div class="status-bar">
+            <div class="status-hint">
+                <i class="fa-solid fa-link"></i> Data is saved in the URL - share the link to share your spreadsheet
+            </div>
+            <div class="url-length-indicator">
+                <span class="url-length-label">URL: <span id="url-length-value">0</span> chars</span>
+                <div class="url-progress-container" title="URL length indicator">
+                    <div id="url-progress-bar" class="url-progress-bar"></div>
+                </div>
+                <span id="url-length-message" class="url-length-message"></span>
+            </div>
+        </div>
     </div>
 
     <!-- Password Modal -->
