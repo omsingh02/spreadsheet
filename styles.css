@@ -70,7 +70,7 @@ body {
     background-image: 
         radial-gradient(circle at 1px 1px, var(--border-color) 1px, transparent 0);
     background-size: 24px 24px;
-    background-attachment: fixed; /* Parallax-like feel, pattern stays static */
+    background-attachment: fixed;
     
     color: var(--text-primary);
     transition: background-color 0.3s, color 0.3s;
@@ -486,7 +486,7 @@ body {
 .grid-wrapper {
     flex: 1;
     overflow: auto;
-    background: var(--bg-secondary);
+    background: transparent;
     transition: background-color 0.3s;
 }
 
@@ -582,7 +582,6 @@ body.resizing {
     border: 1px solid var(--border-color);
     margin: -1px 0 0 -1px;
     transition: border-color 0.3s;
-    /* Solid background to prevent dot pattern from making text unreadable */
     background-color: var(--bg-secondary);
 }
 
