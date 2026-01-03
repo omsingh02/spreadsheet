@@ -3474,4 +3474,68 @@
         console.log('4,000-8,000: Caution (URL shorteners may fail)');
         console.log('> 8,000: Critical (some browsers may fail)');
     };
+    // ========== Toolbar Scroll Logic ==========
+    function initToolbarScroll() {
+        const toolbar = document.querySelector('.toolbar');
+        const scrollLeftBtn = document.getElementById('scroll-left');
+        const scrollRightBtn = document.getElementById('scroll-right');
+        
+        if (!toolbar || !scrollLeftBtn || !scrollRightBtn) return;
+
+        function updateScrollButtons() {
+            // Check if content overflows
+            const isOverflowing = toolbar.scrollWidth > toolbar.clientWidth;
+            const scrollLeft = toolbar.scrollLeft;
+            const maxScroll = toolbar.scrollWidth - toolbar.clientWidth;
+            
+            // Tolerance (fixes weird browser sub-pixel issues)
+            const tolerance = 2;
+
+            if (!isOverflowing) {
+                scrollLeftBtn.classList.add('hidden');
+                scrollRightBtn.classList.add('hidden');
+                return;
+            }
+
+            // Show/Hide Left Button
+            if (scrollLeft > tolerance) {
+                scrollLeftBtn.classList.remove('hidden');
+            } else {
+                scrollLeftBtn.classList.add('hidden');
+            }
+
+            // Show/Hide Right Button
+            if (scrollLeft < maxScroll - tolerance) {
+                scrollRightBtn.classList.remove('hidden');
+            } else {
+                scrollRightBtn.classList.add('hidden');
+            }
+        }
+
+        // Scroll amount for button clicks
+        const scrollAmount = 200;
+
+        scrollLeftBtn.addEventListener('click', () => {
+            toolbar.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+        });
+
+        scrollRightBtn.addEventListener('click', () => {
+            toolbar.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        });
+
+        // Listen for scroll events
+        toolbar.addEventListener('scroll', () => {
+             // Debounce the UI update slightly for performance
+             requestAnimationFrame(updateScrollButtons);
+        });
+
+        // Update on resize
+        window.addEventListener('resize', updateScrollButtons);
+
+        // Initial check
+        updateScrollButtons();
+    }
+
+    // Initialize all modules
+    initToolbarScroll();
 })();
