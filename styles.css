@@ -370,6 +370,28 @@ body {
 }
 /* ========== End Read-only Mode Styles ========== */
 
+/* ========== Embed Mode Styles ========== */
+.embed-mode .header {
+    display: none;
+}
+
+.embed-mode .status-bar {
+    display: none;
+}
+
+.embed-mode .scroll-btn {
+    display: none;
+}
+
+.embed-mode .readonly-banner {
+    display: none;
+}
+
+.embed-mode .grid-wrapper {
+    height: 100vh;
+}
+/* ========== End Embed Mode Styles ========== */
+
 .size-control {
     display: inline-flex;
     align-items: center;
@@ -1094,6 +1116,25 @@ body.resizing {
 .modal-btn-primary:disabled {
     background: var(--text-muted);
     cursor: not-allowed;
+}
+
+/* Embed modal specific styles */
+.embed-code-container {
+    margin: 16px 0;
+}
+
+#embed-code-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    resize: vertical;
+    line-height: 1.5;
 }
 
 /* Lock button states */

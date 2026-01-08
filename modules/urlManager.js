@@ -676,6 +676,7 @@ export function validateAndNormalizeState(parsed) {
         rowHeights: h,
         theme: parsed.theme || null,
         readOnly: Boolean(parsed.readOnly),
+        embed: Boolean(parsed.embed),
       };
     }
 
