@@ -505,14 +505,13 @@ import {
   // Toggle read-only mode
   function toggleReadOnlyMode() {
     isReadOnly = !isReadOnly;
-
-    if (isReadOnly) {
-      applyReadOnlyMode();
-      showToast("Read-only mode enabled - Share this link for view-only access", "success");
-    } else {
-      clearReadOnlyMode();
-      showToast("Edit mode enabled", "success");
-    }
+    applyReadOnlyState(isReadOnly);
+    showToast(
+      isReadOnly
+        ? "Read-only mode enabled - Share this link for view-only access"
+        : "Edit mode enabled",
+      "success"
+    );
 
     // Update URL immediately (no debounce)
     updateURL();
@@ -1046,12 +1045,7 @@ import {
         }
 
         // Load read-only mode
-        isReadOnly = loadedState.readOnly || false;
-        if (isReadOnly) {
-          applyReadOnlyMode();
-        } else {
-          clearReadOnlyMode();
-        }
+        applyReadOnlyState(loadedState.readOnly);
 
         return true;
       }
@@ -1159,6 +1153,19 @@ import {
   // ========== Password/Encryption Modal Functions ==========
   // Handled by PasswordManager module
 
+  /**
+   * Apply read-only state to the spreadsheet
+   * @param {boolean} readOnlyFlag - Whether to enable read-only mode
+   */
+  function applyReadOnlyState(readOnlyFlag) {
+    isReadOnly = readOnlyFlag || false;
+    if (isReadOnly) {
+      applyReadOnlyMode();
+    } else {
+      clearReadOnlyMode();
+    }
+  }
+
   // Apply loaded state to variables
   function applyLoadedState(loadedState) {
     if (!loadedState) return;
@@ -1225,6 +1232,9 @@ import {
     if (loadedState.theme) {
       applyTheme(loadedState.theme);
     }
+
+    // Apply read-only mode if present
+    applyReadOnlyState(loadedState.readOnly);
   }
 
   // Initialize the app
