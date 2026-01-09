@@ -5,6 +5,7 @@
 import { DEBOUNCE_DELAY, DEFAULT_COLS, DEFAULT_ROWS, MAX_COLS, MAX_ROWS } from "./modules/constants.js";
 import { buildRangeRef, FormulaDropdownManager, FormulaEvaluator, isValidFormula } from "./modules/formulaManager.js";
 import { PasswordManager } from "./modules/passwordManager.js";
+import { CSVManager } from "./modules/csvManager.js";
 import {
   addColumn,
   addRow,
@@ -221,11 +222,28 @@ import {
     return text.replace(/\u00a0/g, " ");
   }
 
-  function csvEscape(value) {
-    const text = String(value);
-    const needsQuotes = /[",\r\n]/.test(text) || /^\s|\s$/.test(text);
-    const escaped = text.replace(/"/g, '""');
-    return needsQuotes ? `"${escaped}"` : escaped;
+  function getDataArray() {
+    return data;
+  }
+
+  function setDataArray(newData) {
+    data = newData;
+  }
+
+  function getFormulasArray() {
+    return formulas;
+  }
+
+  function setFormulasArray(newFormulas) {
+    formulas = newFormulas;
+  }
+
+  function getCellStylesArray() {
+    return cellStyles;
+  }
+
+  function setCellStylesArray(newCellStyles) {
+    cellStyles = newCellStyles;
   }
 
   function formatStatNumber(value) {
@@ -298,156 +316,6 @@ import {
     }
 
     bar.classList.add("active");
-  }
-
-  function buildCSV() {
-    const { rows, cols } = getState();
-    const lines = [];
-    for (let r = 0; r < rows; r++) {
-      const rowValues = [];
-      for (let c = 0; c < cols; c++) {
-        const raw = data[r][c];
-        const text = extractPlainText(raw);
-        rowValues.push(csvEscape(text));
-      }
-      lines.push(rowValues.join(","));
-    }
-    return lines.join("\r\n");
-  }
-
-  function downloadCSV() {
-    recalculateFormulas();
-    const csv = buildCSV();
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "spreadsheet.csv";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    showToast("CSV downloaded", "success");
-  }
-
-  function parseCSV(text) {
-    if (!text) return [];
-
-    const rows = [];
-    let row = [];
-    let field = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-
-      if (inQuotes) {
-        if (char === '"') {
-          if (text[i + 1] === '"') {
-            field += '"';
-            i++;
-          } else {
-            inQuotes = false;
-          }
-        } else {
-          field += char;
-        }
-        continue;
-      }
-
-      if (char === '"') {
-        inQuotes = true;
-      } else if (char === ",") {
-        row.push(field);
-        field = "";
-      } else if (char === "\r") {
-        if (text[i + 1] === "\n") {
-          i++;
-        }
-        row.push(field);
-        rows.push(row);
-        row = [];
-        field = "";
-      } else if (char === "\n") {
-        row.push(field);
-        rows.push(row);
-        row = [];
-        field = "";
-      } else {
-        field += char;
-      }
-    }
-
-    row.push(field);
-    rows.push(row);
-
-    if (rows.length && rows[0].length && rows[0][0]) {
-      rows[0][0] = rows[0][0].replace(/^\uFEFF/, "");
-    }
-
-    if (/\r?\n$/.test(text)) {
-      const lastRow = rows[rows.length - 1];
-      if (lastRow && lastRow.length === 1 && lastRow[0] === "") {
-        rows.pop();
-      }
-    }
-
-    return rows;
-  }
-
-  function importCSVText(text) {
-    const parsedRows = parseCSV(text);
-    if (!parsedRows.length) {
-      showToast("CSV file is empty", "error");
-      return;
-    }
-
-    const maxCols = parsedRows.reduce((max, row) => Math.max(max, row.length), 0);
-    const nextRows = Math.min(Math.max(parsedRows.length, 1), MAX_ROWS);
-    const nextCols = Math.min(Math.max(maxCols, 1), MAX_COLS);
-
-    const truncated = parsedRows.length > MAX_ROWS || maxCols > MAX_COLS;
-
-    // Update state in rowColManager
-    setState("rows", nextRows);
-    setState("cols", nextCols);
-    setState("colWidths", createDefaultColumnWidths(nextCols));
-    setState("rowHeights", createDefaultRowHeights(nextRows));
-
-    data = createEmptyData(nextRows, nextCols);
-    formulas = createEmptyData(nextRows, nextCols);
-    cellStyles = createEmptyCellStyles(nextRows, nextCols);
-
-    for (let r = 0; r < nextRows; r++) {
-      const sourceRow = Array.isArray(parsedRows[r]) ? parsedRows[r] : [];
-      for (let c = 0; c < nextCols; c++) {
-        const raw = sourceRow[c] !== undefined ? String(sourceRow[c]) : "";
-        if (raw.startsWith("=")) {
-          // Security: Validate formula against whitelist before storing
-          if (isValidFormula(raw)) {
-            formulas[r][c] = raw;
-            data[r][c] = raw;
-          } else {
-            // Invalid formula pattern - treat as escaped text
-            formulas[r][c] = "";
-            data[r][c] = escapeHTML(raw);
-          }
-        } else {
-          // Escape HTML in CSV values to prevent XSS
-          data[r][c] = escapeHTML(raw);
-        }
-      }
-    }
-
-    renderGrid();
-    recalculateFormulas();
-    debouncedUpdateURL();
-
-    if (truncated) {
-      showToast("CSV imported (some data truncated due to size limits)", "warning");
-    } else {
-      showToast("CSV imported successfully", "success");
-    }
   }
 
   // Helper functions moved to modules/urlManager.js
@@ -1474,18 +1342,12 @@ import {
     setCallbacks({
       debouncedUpdateURL,
       recalculateFormulas,
-      getDataArray: () => data,
-      setDataArray: (newData) => {
-        data = newData;
-      },
-      getFormulasArray: () => formulas,
-      setFormulasArray: (newFormulas) => {
-        formulas = newFormulas;
-      },
-      getCellStylesArray: () => cellStyles,
-      setCellStylesArray: (newCellStyles) => {
-        cellStyles = newCellStyles;
-      },
+      getDataArray,
+      setDataArray,
+      getFormulasArray,
+      setFormulasArray,
+      getCellStylesArray,
+      setCellStylesArray,
       PasswordManager,
       getReadOnlyFlag: () => isReadOnly,
       // Formula mode callbacks
@@ -1503,6 +1365,20 @@ import {
       insertTextAtCursor,
       FormulaDropdownManager,
       onSelectionChange: updateSelectionStatusBar,
+    });
+
+    CSVManager.init({
+      getState,
+      getDataArray,
+      setDataArray,
+      setFormulasArray,
+      setCellStylesArray,
+      setState,
+      renderGrid,
+      recalculateFormulas,
+      debouncedUpdateURL,
+      showToast,
+      extractPlainText,
     });
 
     // Load theme preference first (before any rendering)
@@ -1685,7 +1561,7 @@ import {
 
         const reader = new FileReader();
         reader.onload = function () {
-          importCSVText(String(reader.result || ""));
+          CSVManager.importCSVText(String(reader.result || ""));
         };
         reader.onerror = function () {
           alert("Failed to read the CSV file.");
@@ -1695,7 +1571,7 @@ import {
       });
     }
     if (exportCsvBtn) {
-      exportCsvBtn.addEventListener("click", downloadCSV);
+      exportCsvBtn.addEventListener("click", () => CSVManager.downloadCSV());
     }
     if (qrBtn) {
       qrBtn.addEventListener("click", showQRModalWithCode);
