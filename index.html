@@ -1,21 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head><!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-77V3TP2B5T"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
-
-        // Security: Exclude URL hash from analytics to prevent leaking spreadsheet data
-        gtag('config', 'G-77V3TP2B5T', {
-            'page_location': window.location.origin + window.location.pathname,
-            'page_path': window.location.pathname
-        });
-    </script>
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+    <meta name="googlebot" content="noindex, nofollow">
+    <meta name="bingbot" content="noindex, nofollow">
+    <meta name="crawler" content="noindex, nofollow">
     <!--
         Security Note: Content Security Policy
         - 'unsafe-inline' in style-src is required for user-controlled dynamic cell styling (colors, alignment, font-size).
@@ -28,7 +20,7 @@
         - Note: script-src does NOT include 'unsafe-inline' or 'unsafe-eval', blocking inline script injection
     -->
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://www.googletagmanager.com 'sha256-vvt4KWwuNr51XfE5m+hzeNEGhiOfZzG97ccfqGsPwvE='; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com;">
+        content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'sha256-vvt4KWwuNr51XfE5m+hzeNEGhiOfZzG97ccfqGsPwvE='; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self';">
     <title>Spreadsheet</title>
     <link rel="icon" href="favicon.png" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
