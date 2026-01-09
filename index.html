@@ -101,6 +101,9 @@
                     <i class="fa-solid fa-sun icon-light"></i>
                     <i class="fa-solid fa-moon icon-dark"></i>
                 </button>
+                <button id="qr-btn" type="button" class="copy-btn" title="Open on mobile">
+                    <i class="fa-solid fa-qrcode"></i>
+                </button>
                 <button id="copy-url" type="button" class="copy-btn" title="Copy URL to clipboard">
                     <i class="fa-solid fa-copy"></i>
                 </button>
@@ -188,9 +191,27 @@
         </div>
     </div>
 
+    <!-- QR Code Modal -->
+    <div id="qr-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content qr-modal-content">
+            <h3>Open on Mobile</h3>
+            <p>Scan this code to continue on your phone.</p>
+            <div class="qr-card">
+                <div id="qrcode-container" class="qr-code"></div>
+            </div>
+            <p id="qr-warning" class="qr-warning hidden"></p>
+            <div class="modal-buttons">
+                <button id="qr-close-btn" type="button" class="modal-btn modal-btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications Container -->
     <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"
         integrity="sha512-qtX0GLM3qX8rxJN1gyDfcnMFFrKvixfoEOwbBib9VafR5vbChV5LeE5wSI/x+IlCkTY5ZFddFDCCfaVJJNnuKQ=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>

@@ -73,6 +73,9 @@ import {
   // Debounce timer
   let debounceTimer = null;
 
+  // Safe limit before QR codes become unreadable on most phone cameras
+  const MAX_QR_URL_LENGTH = 2000;
+
   // Formula range selection mode (for clicking to select ranges like Google Sheets)
   let formulaEditMode = false; // true when typing a formula
   let formulaEditCell = null; // { row, col, element } of cell being edited
@@ -1225,6 +1228,79 @@ import {
       });
   }
 
+  // Generate and display QR code for the current URL
+  async function showQRModalWithCode() {
+    const modal = document.getElementById("qr-modal");
+    const container = document.getElementById("qrcode-container");
+    const warningText = document.getElementById("qr-warning");
+
+    if (!modal || !container) return;
+
+    if (typeof QRCode !== "function") {
+      alert("QR Generator module not loaded.");
+      return;
+    }
+
+    // Ensure formulas are fresh and the latest state is encoded into the URL
+    recalculateFormulas();
+    try {
+      await updateURL();
+    } catch (err) {
+      console.error("Failed to sync data before generating QR", err);
+      alert("Could not prepare data for QR code.");
+      return;
+    }
+
+    const currentUrl = window.location.href;
+
+    container.innerHTML = "";
+    if (warningText) {
+      warningText.textContent = "";
+      warningText.classList.add("hidden");
+    }
+
+    if (currentUrl.length > MAX_QR_URL_LENGTH) {
+      if (warningText) {
+        warningText.textContent = `Spreadsheet too large for QR transfer (${currentUrl.length} characters). Remove some data and try again.`;
+        warningText.classList.remove("hidden");
+      }
+      modal.classList.remove("hidden");
+      return;
+    }
+
+    try {
+      new QRCode(container, {
+        text: currentUrl,
+        width: 240,
+        height: 240,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+      modal.classList.remove("hidden");
+    } catch (e) {
+      console.error("QR Library missing or error", e);
+      alert("Could not generate QR code.");
+    }
+  }
+
+  function hideQRModal() {
+    const modal = document.getElementById("qr-modal");
+    const container = document.getElementById("qrcode-container");
+    const warningText = document.getElementById("qr-warning");
+
+    if (modal) {
+      modal.classList.add("hidden");
+    }
+    if (container) {
+      container.innerHTML = "";
+    }
+    if (warningText) {
+      warningText.textContent = "";
+      warningText.classList.add("hidden");
+    }
+  }
+
   // ========== Password/Encryption Modal Functions ==========
   // Handled by PasswordManager module
 
@@ -1502,6 +1578,9 @@ import {
     const importCsvBtn = document.getElementById("import-csv");
     const importCsvInput = document.getElementById("import-csv-file");
     const exportCsvBtn = document.getElementById("export-csv");
+    const qrBtn = document.getElementById("qr-btn");
+    const qrCloseBtn = document.getElementById("qr-close-btn");
+    const qrBackdrop = document.querySelector("#qr-modal .modal-backdrop");
 
     if (addRowBtn) {
       addRowBtn.addEventListener("click", addRow);
@@ -1541,6 +1620,15 @@ import {
     }
     if (exportCsvBtn) {
       exportCsvBtn.addEventListener("click", downloadCSV);
+    }
+    if (qrBtn) {
+      qrBtn.addEventListener("click", showQRModalWithCode);
+    }
+    if (qrCloseBtn) {
+      qrCloseBtn.addEventListener("click", hideQRModal);
+    }
+    if (qrBackdrop) {
+      qrBackdrop.addEventListener("click", hideQRModal);
     }
 
     // Embed mode event listeners

@@ -1137,6 +1137,42 @@ body.resizing {
     line-height: 1.5;
 }
 
+.qr-modal-content {
+    max-width: 420px;
+    width: 92%;
+    text-align: center;
+}
+
+.qr-card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 12px 0 4px 0;
+}
+
+.qr-code img,
+.qr-code canvas {
+    display: block;
+    height: auto;
+    width: 240px;
+    max-width: 100%;
+}
+
+.qr-warning {
+    margin: 8px 0 0 0;
+    font-size: 0.85rem;
+    color: #dc2626;
+}
+
+.qr-warning.hidden {
+    display: none;
+}
+
 /* Lock button states */
 .lock-btn.locked {
     color: var(--accent-color) !important;
